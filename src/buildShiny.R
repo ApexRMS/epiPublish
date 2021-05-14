@@ -25,16 +25,13 @@ transformerName <- "Data Publication: Publish to Shiny"
 
 # Load settings and definitions from SyncroSim
 settings <- datasheet(myScenario, name = "epiPublish_ShinyInputs", lookupsAsFactors = F)
-resultScenarios <- scenario(myProject, results = T)
 transformers <- datasheet(myProject, "core_Transformer", includeKey = T)
+stages <- datasheet(myProject, "core_StageName", includeKey = T)
 jurisdictions <- datasheet(myProject, "epi_Jurisdiction", includeKey = T)
 variableNames <- datasheet(myProject, "epi_Variable", includeKey = T)
 
 ## Parse Settings ----
-summaryFunction <- settings$Summary %>%
-  switch(
-    "Min/Max" = function(x, upper) if(upper) max(x) else min(x),
-    "None" = function(...) NA)
+summaryFunction <- function(x, upper) if(upper) quantile(x, 1 - (100 - settings$Percentile) / 200) else quantile(x, (100 - settings$Percentile) / 200)
 
 options <- list(
   title = settings$Title
@@ -47,7 +44,7 @@ outputBaseFolder <- file.path(dirname(ssimEnvironment()$LibraryFilePath), settin
 dir.create(outputBaseFolder)
 
 # Copy over the shiny app
-file.copy(file.path(ssimEnvironment()$PackageDirectory, "app.R"), file.path(outputBaseFolder, "app.R"))
+file.copy(file.path(str_replace_all(ssimEnvironment()$PackageDirectory, "\\\\", "/"), "app.R"), file.path(outputBaseFolder, "app.R"), overwrite = T)
 
 # Create folder for data files
 outputFolder <- file.path(outputBaseFolder, "data")
@@ -58,9 +55,45 @@ write_yaml(options, file.path(outputFolder, "options.yaml"))
 
 # Prepare data ----
 
+# Find the scenarios to pull data from
+rsyncrosim::command(list(list = NA, folders = NA, lib = ssimEnvironment()$LibraryFilePath, csv = NA)) %>%
+  writeLines(file("temp.csv"))
+
+publishFolder <- read_csv("temp.csv") %>%
+  filter(`Is Lite` == "Yes") %>%
+  pull(ID)
+
+if(length(publishFolder) == 0) {
+  resultScenarios <- scenario(myProject, results = T)$scenarioId
+} else {
+  resultScenarios <-
+    rsyncrosim::command(list(list = NA, library = NA, lib = ssimEnvironment()$LibraryFilePath, tree = NA, csv = NA)) %>%
+    # Remove all lines before the folder of interest
+    `[`((str_which(., str_c("Folder \\[", publishFolder, "\\]")) + 1):length(.)) %>%
+    # Remove all lines after the folder of interest if there is another folder listed in the tree
+    `[`(1:ifelse(any(str_detect(., "Folder ")), str_which(., "Folder ") - 1, length(.))) %>%
+    # Keep only result scenarios
+    str_subset("Result\\(S\\) ") %>%
+    # Extract scenario IDs
+    str_extract("\\[\\d*\\]") %>%
+    str_sub(2, -2) %>%
+    as.integer
+}
+
+# Identify last transformer of each scenario
+finalTransformer <- datasheet(myProject, scenario = resultScenarios, name = "core_Pipeline", lookupsAsFactors = F) %>%
+  group_by(ScenarioID) %>%
+  filter(RunOrder == max(RunOrder)) %>%
+  ungroup() %>%
+  mutate(transformer = lookup(StageNameID, stages$StageNameID, stages$Name)) %>%
+  pull(transformer, name = ScenarioID)
+
+if(any(!finalTransformer %in% transformers$TransformerDisplayName))
+  stop("Error: Custom stages with multiple transformers not yet implemented.")
+
 # Preliminary clean up of input data
 inputData <- 
-  datasheet(myProject, scenario = resultScenarios$scenarioId, name = "epi_DataSummary", optional = T, lookupsAsFactors = F) %>%
+  datasheet(myProject, scenario = resultScenarios, name = "epi_DataSummary", optional = T, lookupsAsFactors = F) %>%
     mutate(
       Parent = ParentName,
       Scenario = ScenarioName,
@@ -69,7 +102,9 @@ inputData <-
       Variable = lookup(Variable, variableNames$VariableID, variableNames$Name),
       Jurisdiction = lookup(Jurisdiction, jurisdictions$JurisdictionID, jurisdictions$Name),
       Model = !is.na(Iteration)) %>%
-    select(Parent, ScenarioID, Scenario, Transformer, Date, Iteration, Variable, Jurisdiction, Value, Model, AgeMin, AgeMax, Sex)
+    select(Parent, ScenarioID, Scenario, Transformer, Date, Iteration, Variable, Jurisdiction, Value, Model, AgeMin, AgeMax, Sex) %>%
+    # Only keep data from the last transformer in the pipeline of each scenario
+    filter(Transformer == finalTransformer[as.character(ScenarioID)])
 
 # Find the dates each scenario was run ---
 scenarioIDs <- inputData$ScenarioID %>% unique
