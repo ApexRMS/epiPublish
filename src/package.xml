@@ -17,11 +17,11 @@
                 <column name="ShinyInputsID" dataType="Integer" isPrimary="True"/>
                 <column name="ScenarioID" dataType="Integer" displayName="Scenario"/>
                 <column name="Title" dataType="String"/>
-                <column name="Summary" dataType="Integer" displayName="Summary function" validationType="List" formula1="0:Min/Max|1:None"/>
+                <column name="Percentile" dataType="Integer" displayName="Confidence interval (%)" validationType="WholeNumber" validationCondition="LessEqual" formula1="100" format="d"/>
                 <column name="Output" dataType="String" displayName="Output folder"/>
               </columns>
               <defaultRecords>
-                <record columns="Title|Summary|Output" values="COVID-19 Projections|0|shiny"/>
+                <record columns="Title|Percentile|Output" values="COVID-19 Projections|67|shiny"/>
               </defaultRecords>
             </datasheet>
           </datasheets>
