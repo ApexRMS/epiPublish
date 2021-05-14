@@ -7,6 +7,7 @@ library(forcats)
 library(purrr)
 library(lubridate)
 library(yaml)
+library(stringr)
 
 # Load Data -----
 inputData <- read_csv("data/data.csv")
@@ -36,8 +37,6 @@ runDates %>%
   tail(1) %>%
   loadByDate
 
-dataSerieslevels <- c(dataScenarios$DataSeries, modelScenarios$DataSeries) %>% unique %>% sort
-
 # UI ----
 
 ui <- fluidPage(
@@ -54,7 +53,7 @@ ui <- fluidPage(
       # Input: Data scenarios
       pickerInput(
         inputId = "dataScenario",
-        label = "Data Scenarios",
+        label = "Data",
         choices = dataScenarios$Parent %>% unique,
         selected = dataScenarios$Parent %>% unique,
         options = list(`actions-box` = TRUE),
@@ -63,18 +62,16 @@ ui <- fluidPage(
       # Input: 
       pickerInput(
         inputId = "modelScenario",
-        label = "Model Scenarios",
+        label = "Forecasts",
         choices = modelScenarios$Parent %>% unique,
         selected = modelScenarios$Parent %>% unique,
         options = list(`actions-box` = TRUE),
         multiple = TRUE),
       
-      h3("Include:"),
-      
       # Input: Dates to plot
       airDatepickerInput(
         inputId = "runDates",
-        label = "Model Run Dates",
+        label = "Forecast Dates",
         value = tail(runDates, 1) + 1,
         range= TRUE,
         clearButton = TRUE,
@@ -87,7 +84,7 @@ ui <- fluidPage(
         label = "Variables",
         choices = inputData$Variable %>% unique,
         selected = inputData$Variable %>% unique %>% `[`(1),
-        multiple = TRUE),
+        multiple = FALSE),
     
       # Input: Which jurisdictions to plot
       pickerInput(
@@ -96,25 +93,7 @@ ui <- fluidPage(
         choices = inputData$Jurisdiction %>% unique,
         selected = inputData$Jurisdiction %>% unique,
         options = list(`actions-box` = TRUE),
-        multiple = TRUE),
-      
-      # Input: Which transformers to plot
-      pickerInput(
-        inputId = "transformers",
-        label = "Transformers",
-        choices = c(dataScenarios$Transformer, modelScenarios$Transformer) %>% unique %>% sort,
-        selected = c(dataScenarios$Transformer, modelScenarios$Transformer) %>% unique,
-        options = list(`actions-box` = TRUE),
-        multiple = TRUE),
-      
-      h3("Disaggregate by:"),
-      
-      # Input: Disaggregate jurisdictions
-      checkboxInput(
-        inputId = "jurisdictionDisaggregate",
-        label = "Jurisdiction",
-        value = 1
-      )
+        multiple = FALSE)
     ),
                                            
     
@@ -140,24 +119,13 @@ server <- function(input, output) {
       filter(
         Variable == input$variable,
         Jurisdiction %in% input$jurisdiction,
-        Transformer %in% input$transformers,
         (!Model & Parent %in% input$dataScenario) | (Model & Parent %in% input$modelScenario & RunDate %in% input$runDates))
-    
-    if(!input$jurisdictionDisaggregate)
-      formattedData <- formattedData %>%
-        group_by(Parent, Scenario, Transformer, Variable, Date, RunDate, Model, DataSeries) %>%
-        summarise(
-          Value = sum(Value),
-          Lower = sum(Lower),
-          Upper = sum(Upper)) %>%
-        ungroup %>%
-        mutate(Jurisdiction = "All Jurisdictions")
     
     formattedData %>%
       ggplot(aes(Date, Value)) +
-        geom_line(data = formattedData %>% filter(Model), aes(colour = DataSeries)) +
-        geom_point(data = formattedData %>% filter(!Model), aes(colour = DataSeries, fill = DataSeries), size = 1) +
-        geom_ribbon(data = formattedData %>% filter(Model), aes(ymin = Lower, ymax = Upper, colour = DataSeries, fill = DataSeries), alpha = 0.2) +
+        geom_line(data = formattedData %>% filter(Model), aes(colour = Scenario)) +
+        geom_point(data = formattedData %>% filter(!Model), aes(colour = Scenario, fill = Scenario), size = 1) +
+        geom_ribbon(data = formattedData %>% filter(Model), aes(ymin = Lower, ymax = Upper, colour = Scenario, fill = Scenario), alpha = 0.2) +
         facet_wrap(Jurisdiction ~ Variable, scales = "free_y") +
         theme_bw()
   })
