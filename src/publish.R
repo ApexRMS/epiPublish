@@ -69,24 +69,24 @@ write_yaml(options, file.path(outputFolder, "options.yaml"))
 # Prepare data ----
 
 # Find the scenarios to pull data from
-rsyncrosim::command(list(list = NA, folders = NA, lib = ssimEnvironment()$LibraryFilePath, csv = NA)) %>%
-  writeLines(file("temp.csv"))
-close(file("temp.csv"))
+ssimTree <- rsyncrosim::command(list(list = NA, library = NA, lib = ssimEnvironment()$LibraryFilePath, tree = NA, csv = NA))
 
-publishFolder <- read_csv("temp.csv") %>%
-  filter(`Is Lite` == "Yes") %>%
-  pull(ID)
-unlink("temp.csv")
-
-if(length(publishFolder) == 0) {
+if(!any(str_detect(ssimTree, "\\*Folder"))) { # If none of the folders are tagged to be published, use all result scenarios
   resultScenarios <- scenario(myProject, results = T)$scenarioId
 } else {
-  resultScenarios <-
-    rsyncrosim::command(list(list = NA, library = NA, lib = ssimEnvironment()$LibraryFilePath, tree = NA, csv = NA)) %>%
+  # Find the depth of the elements in the publish folder
+  folderDepth <- 
+    str_c(
+      "^", # Regex for beginning of the string
+      str_subset(ssimTree, "\\*Folder") %>%
+      str_extract(".*\\+") %>%
+      str_replace("\\+", "\\\\|"))
+  
+  resultScenarios <- ssimTree %>%
     # Remove all lines before the folder of interest
-    `[`((str_which(., str_c("Folder \\[", publishFolder, "\\]")) + 1):length(.)) %>%
-    # Remove all lines after the folder of interest if there is another folder listed in the tree
-    `[`(1:ifelse(any(str_detect(., "Folder ")), str_which(., "Folder ") - 1, length(.))) %>%
+    `[`((str_which(.,  "\\*Folder") + 1):length(.)) %>%
+    # Remove all lines after the folder of interest if there is another folder listed in the tree at the same depth as the publish folder
+    `[`(1:ifelse(any(str_detect(., folderDepth, negate = T)), head(str_which(., folderDepth, negate = T), 1) - 1, length(.))) %>%
     # Keep only result scenarios
     str_subset("Result\\(S\\) ") %>%
     # Extract scenario IDs
