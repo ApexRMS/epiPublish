@@ -2,11 +2,11 @@
 <package name="epiPublish" displayName="Data Publication" isAddOn="True" extendsPackage="epi" version="1.0.0">
   <transformers>
     <transformer
-      name="PublishShiny"
+      name="PublishDashboard"
       isPrimary="True"
-      displayName="Data Publication: Publish to Shiny"
+      displayName="Data Publication: Publish Dashboard"
       programName="Rscript"
-      programArguments="buildShiny.R"
+      programArguments="publish.R"
       runContext="LocalOnly"
       isRunnable ="True">
       <datafeeds>
@@ -18,10 +18,12 @@
                 <column name="ScenarioID" dataType="Integer" displayName="Scenario"/>
                 <column name="Title" dataType="String"/>
                 <column name="Percentile" dataType="Integer" displayName="Confidence interval (%)" validationType="WholeNumber" validationCondition="LessEqual" formula1="100" format="d"/>
-                <column name="Output" dataType="String" displayName="Output folder"/>
+                <column name="ShinyURL" dataType="String" displayName="Publish URL"/>
+                <column name="ShinyToken" displayName="User token" dataType="String" isExternalFile="True"/>
+                <column name="ShinySecret" displayName="Authentication key" dataType="String" isExternalFile="True"/>
               </columns>
               <defaultRecords>
-                <record columns="Title|Percentile|Output" values="COVID-19 Projections|67|shiny"/>
+                <record columns="Title|Percentile" values="COVID-19 Projections|67"/>
               </defaultRecords>
             </datasheet>
           </datasheets>
@@ -35,15 +37,8 @@
   </transformers>
   <layouts>
     <layout name="coreforms_ScenarioDatafeeds">
-      <group name="Shiny" displayName="Publish to Shiny" appendTo="epi_Transformations">
-          <item name="ShinyInputs" itemTransformer="PublishShiny" showIf="isEither"/>
-          <item
-            name="epi_DataSummary"
-            displayName="Data to Publish"
-            showIf="isEither"
-            viewClassName="SyncroSim.Core.Forms.MultiRowDataFeedView"
-            viewClassAssembly="SyncroSim.Core.Forms"
-            itemTransformer="PublishShiny" />
+      <group name="Shiny" displayName="Publish Dashboard" appendTo="epi_Transformations">
+          <item name="ShinyInputs" itemTransformer="PublishDashboard" showIf="isEither"/>
       </group>
     </layout>
   </layouts>
