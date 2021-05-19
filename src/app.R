@@ -54,7 +54,7 @@ ui <- fluidPage(
       # Input: Which jurisdictions to plot
       pickerInput(
         inputId = "jurisdiction",
-        label = "Jurisdictions",
+        label = "Jurisdiction",
         choices = inputData$Jurisdiction %>% unique,
         selected = inputData$Jurisdiction %>% unique %>% `[`(1),
         options = list(`actions-box` = TRUE),
@@ -63,7 +63,7 @@ ui <- fluidPage(
       # Input: Which variable to plot
       pickerInput(
         inputId = "variable",
-        label = "Variables",
+        label = "Variable",
         choices = inputData$Variable %>% unique,
         selected = ifelse("Cases - Daily" %in% inputData$Variable, "Cases - Daily", inputData$Variable %>% unique %>% `[`(1)),
         multiple = FALSE),
@@ -87,22 +87,22 @@ ui <- fluidPage(
         multiple = TRUE),
       
       # Input: Forecast dates to plot
-      airDatepickerInput(
+      dateInput(
         inputId = "runDates",
-        label = "Forecast Dates",
-        value = tail(runDates, 1) + 1,
-        clearButton = TRUE,
-        todayButton = TRUE
+        label = "Forecast Date",
+        value = tail(runDates, 1),
+        min = head(runDates, 1),
+        max = tail(runDates, 1)
       ),
       
       # Input: x axis range
-      airDatepickerInput(
+      dateRangeInput(
         inputId = "xlim",
         label = "Plot Range",
-        value = c(min(inputData$Date), max(inputData$Date)),
-        clearButton = TRUE,
-        todayButton = TRUE,
-        range = TRUE
+        start = min(inputData$Date),
+        end = max(inputData$Date),
+        min = min(inputData$Date),
+        max = max(inputData$Date)
       )
     ),
                                            
