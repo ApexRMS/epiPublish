@@ -80,7 +80,7 @@ if(!any(str_detect(ssimTree, "\\*Folder"))) { # If none of the folders are tagge
       "^", # Regex for beginning of the string
       str_subset(ssimTree, "\\*Folder") %>%
       str_extract(".*\\+") %>%
-      str_replace("\\+", "\\\\|"))
+      str_replace("\\+", "[\\\\| ]"))
   
   resultScenarios <- ssimTree %>%
     # Remove all lines before the folder of interest
