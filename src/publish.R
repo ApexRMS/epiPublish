@@ -54,6 +54,7 @@ options <- list(
 
 # Create main shiny folder
 outputBaseFolder <- file.path(dirname(ssimEnvironment()$LibraryFilePath), settings$Output)
+unlink(outputBaseFolder, recursive = T)
 dir.create(outputBaseFolder)
 
 # Copy over the shiny app
@@ -62,6 +63,9 @@ file.copy(file.path(str_replace_all(ssimEnvironment()$PackageDirectory, "\\\\", 
 # Create folder for data files
 outputFolder <- file.path(outputBaseFolder, "data")
 dir.create(outputFolder)
+
+# Copy over region lookup table
+file.copy(file.path(str_replace_all(ssimEnvironment()$PackageDirectory, "\\\\", "/"), "regionLookup.csv"), file.path(outputFolder, "regionLookup.csv"), overwrite = T)
 
 # Save options to data folder
 write_yaml(options, file.path(outputFolder, "options.yaml"))
