@@ -9,6 +9,8 @@ library(lubridate)
 library(yaml)
 library(stringr)
 library(scales)
+library(maps)
+library(viridisLite)
 
 # Load Data -----
 inputData <- read_csv("data/data.csv")
@@ -18,6 +20,15 @@ runDates <- read_csv("data/runDates.csv") %>%
   sort
 dataScenarios <- read_csv("data/dataScenarios.csv")
 modelScenarios <- read_csv("data/modelScenarios.csv")
+regionLookup <- read_csv("data/regionLookup.csv")
+
+# Load map data
+worldMapData <- map_data("world") %>%
+  mutate(
+    Jurisdiction = region,
+    Jurisdiction = dplyr::recode(Jurisdiction, !!!set_names(regionLookup$New, regionLookup$Old))) %>%
+  select(-region, subregion)
+regions <- worldMapData %>% pull(Jurisdiction) %>% unique
 
 # Setup to load model data by run date
 dataLoaded <- rep(FALSE, length(runDates)) %>%
@@ -25,7 +36,7 @@ dataLoaded <- rep(FALSE, length(runDates)) %>%
 
 loadByDate <- function(runDate) {
   runDate <- as.character(runDate)
-  if(!dataLoaded[runDate]) {
+  if(!dataLoaded[runDate] & file.exists(str_c("data/", runDate, ".csv"))) {
     inputData <<- read_csv(str_c("data/", runDate, ".csv")) %>%
       bind_rows(inputData)
     dataLoaded[runDate] <<- TRUE
@@ -111,8 +122,17 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       
-      # Output: Histogram ----
-      plotOutput("mainPlot"))
+      tabsetPanel(type = "tabs",
+                  tabPanel("Plot", plotOutput("mainPlot")),
+                  tabPanel("Map",
+                           plotOutput("worldMap"),
+                           sliderInput("mapDate",
+                                       "Date:",
+                                       min = inputData %>% pull(Date) %>% min,
+                                       max = inputData %>% pull(Date) %>% max,
+                                       value = inputData %>% pull(Date) %>% max,
+                                       timeFormat = '%Y-%m-%d',
+                                       width = "100%"))))
   )
 )
 
@@ -143,6 +163,8 @@ server <- function(input, output) {
             geom_point(data = formattedData %>% filter(!Model), aes(colour = Scenario, fill = Scenario), size = 1) +
             geom_ribbon(data = formattedData %>% filter(Model), aes(ymin = Lower, ymax = Upper, colour = Scenario, fill = Scenario), alpha = 0.2) +
             scale_y_continuous(label=comma) +
+            scale_colour_viridis_d() +
+            scale_fill_viridis_d() +
             labs(x = "Date", y = input$variable) +
             theme_bw() +
             theme(
@@ -165,6 +187,24 @@ server <- function(input, output) {
             legend.direction = "vertical")
       }
     })
+  output$worldMap <- renderPlot({
+    inputData %>%
+      filter(
+        Variable == input$variable,
+        Date == input$mapDate) %>%
+      select(Jurisdiction, Value) %>%
+      right_join(worldMapData, by = "Jurisdiction") %>%
+      arrange(order) %>%
+      ggplot(aes(long, lat)) +
+      geom_polygon(aes(group = group, fill = Value)) +
+      scale_fill_viridis_c(trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
+      labs(fill = input$variable) +
+      theme_void() +
+      theme(
+        legend.title = element_text(family = "Helvetica Neue", face = "bold", size = 14),
+        legend.text = element_text(family = "Helvetica Neue", face = "plain", size = 14)
+      )
+  })
 }
 
 # Run app ----
