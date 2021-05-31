@@ -187,8 +187,10 @@ outputData %>%
   group_split %>%
   walk(~ write_csv(.x, file.path(outputFolder, str_c(.x$RunDate[1], ".csv"))))
 
-# Save list of Run Dates
+# Save list of model Run Dates, unless there are no forecasts
+# - in this case, only list a single run date of most recent data
 outputData %>%
+  filter(if(any(Model)) Model else RunDate == max(RunDate)) %>%
   select(RunDate) %>%
   unique %>%
   write_csv(file.path(outputFolder, "runDates.csv"))

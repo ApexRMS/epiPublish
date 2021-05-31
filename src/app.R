@@ -173,9 +173,10 @@ ui <- fluidPage(
                                        "Date:",
                                        min = inputData %>% pull(Date) %>% min,
                                        max = inputData %>% pull(Date) %>% max,
-                                       value = inputData %>% pull(Date) %>% max,
+                                       value = runDates %>% tail(1),
                                        timeFormat = '%Y-%m-%d',
-                                       width = "100%"))))
+                                       animate = animationOptions(interval = 750, loop = TRUE),
+                                       width = "98%"))))
   )
 )
 
@@ -238,14 +239,14 @@ server <- function(input, output) {
       filter(
         Variable == input$mapVariable,
         Date == input$mapDate,
-        if(Date <= input$mapRunDates) Parent %in% input$mapDataScenario else Parent %in% input$mapModelScenario & RunDate %in% input$mapRunDates) %>%
+        if(input$mapDate <= input$mapRunDates) Parent %in% input$mapDataScenario else Parent %in% input$mapModelScenario & RunDate %in% input$mapRunDates) %>%
       select(Jurisdiction, Value) %>%
       right_join(worldMapData, by = "Jurisdiction") %>%
       arrange(order) %>%
       ggplot(aes(long, lat)) +
       geom_polygon(aes(group = group, fill = Value)) +
       scale_fill_viridis_c(trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
-      labs(fill = input$mapVariable) +
+      labs(fill = str_c(ifelse(input$mapDate <= input$mapRunDates, "Historic\n", "Forecasted\n"), input$mapVariable)) +
       theme_void() +
       theme(
         legend.title = element_text(family = "Helvetica Neue", face = "bold", size = 14),
