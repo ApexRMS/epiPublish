@@ -62,59 +62,100 @@ ui <- fluidPage(
     sidebarPanel(
       width = 3,
     
-      # Input: Which jurisdictions to plot
-      pickerInput(
-        inputId = "jurisdiction",
-        label = "Jurisdiction",
-        choices = inputData$Jurisdiction %>% unique,
-        selected = inputData$Jurisdiction %>% unique %>% `[`(1),
-        options = list(`actions-box` = TRUE),
-        multiple = FALSE),
-      
-      # Input: Which variable to plot
-      pickerInput(
-        inputId = "variable",
-        label = "Variable",
-        choices = inputData$Variable %>% unique,
-        selected = ifelse("Cases - Daily" %in% inputData$Variable, "Cases - Daily", inputData$Variable %>% unique %>% `[`(1)),
-        multiple = FALSE),
-     
-      # Input: Data scenarios
-      pickerInput(
-        inputId = "dataScenario",
-        label = "Data",
-        choices = dataScenarios$Parent %>% unique,
-        selected = dataScenarios$Parent %>% unique,
-        options = list(`actions-box` = TRUE),
-        multiple = TRUE),
-      
-      # Input: 
-      pickerInput(
-        inputId = "modelScenario",
-        label = "Forecasts",
-        choices = modelScenarios$Parent %>% unique,
-        selected = modelScenarios$Parent %>% unique,
-        options = list(`actions-box` = TRUE),
-        multiple = TRUE),
-      
-      # Input: Forecast dates to plot
-      dateInput(
-        inputId = "runDates",
-        label = "Forecast Date",
-        value = tail(runDates, 1),
-        min = head(runDates, 1),
-        max = tail(runDates, 1)
+      # Side bar elements for non-spatial plotting
+      conditionalPanel(
+        condition = "input.plotTab == 1",
+          
+        # Input: Which jurisdictions to plot
+        pickerInput(
+          inputId = "jurisdiction",
+          label = "Jurisdiction",
+          choices = inputData$Jurisdiction %>% unique,
+          selected = inputData$Jurisdiction %>% unique %>% `[`(1),
+          options = list(`actions-box` = TRUE),
+          multiple = FALSE),
+        
+        # Input: Which variable to plot
+        pickerInput(
+          inputId = "variable",
+          label = "Variable",
+          choices = inputData$Variable %>% unique,
+          selected = ifelse("Cases - Daily" %in% inputData$Variable, "Cases - Daily", inputData$Variable %>% unique %>% `[`(1)),
+          multiple = FALSE),
+       
+        # Input: Data scenarios
+        pickerInput(
+          inputId = "dataScenario",
+          label = "Data",
+          choices = dataScenarios$Parent %>% unique,
+          selected = dataScenarios$Parent %>% unique,
+          options = list(`actions-box` = TRUE),
+          multiple = TRUE),
+        
+        # Input: 
+        pickerInput(
+          inputId = "modelScenario",
+          label = "Forecasts",
+          choices = modelScenarios$Parent %>% unique,
+          selected = modelScenarios$Parent %>% unique,
+          options = list(`actions-box` = TRUE),
+          multiple = TRUE),
+        
+        # Input: Forecast dates to plot
+        dateInput(
+          inputId = "runDates",
+          label = "Forecast Date",
+          value = tail(runDates, 1),
+          min = head(runDates, 1),
+          max = tail(runDates, 1)
+        ),
+        
+        # Input: x axis range
+        dateRangeInput(
+          inputId = "xlim",
+          label = "Plot Range",
+          start = min(inputData$Date),
+          end = max(inputData$Date),
+          min = min(inputData$Date),
+          max = max(inputData$Date)
+        )
       ),
       
-      # Input: x axis range
-      dateRangeInput(
-        inputId = "xlim",
-        label = "Plot Range",
-        start = min(inputData$Date),
-        end = max(inputData$Date),
-        min = min(inputData$Date),
-        max = max(inputData$Date)
-      )
+      # Sidebar elements for map plotting
+      conditionalPanel(
+        condition = "input.plotTab == 2",
+          
+        # Input: Which variable to plot
+        pickerInput(
+          inputId = "mapVariable",
+          label = "Variable",
+          choices = inputData$Variable %>% unique,
+          selected = ifelse("Cases - Daily" %in% inputData$Variable, "Cases - Daily", inputData$Variable %>% unique %>% `[`(1)),
+          multiple = FALSE),
+       
+        # Input: Data scenarios
+        pickerInput(
+          inputId = "mapDataScenario",
+          label = "Data",
+          choices = dataScenarios$Parent %>% unique,
+          selected = dataScenarios$Parent %>% unique),
+        
+        # Input: 
+        pickerInput(
+          inputId = "mapModelScenario",
+          label = "Forecast",
+          choices = modelScenarios$Parent %>% unique,
+          selected = modelScenarios$Parent %>% unique),
+        
+        # Input: Forecast dates to plot
+        dateInput(
+          inputId = "mapRunDates",
+          label = "Forecast Date",
+          value = tail(runDates, 1),
+          min = head(runDates, 1),
+          max = tail(runDates, 1)
+        )
+      ),
     ),
                                            
     
@@ -122,9 +163,11 @@ ui <- fluidPage(
     mainPanel(
       width = 9,
       
-      tabsetPanel(type = "tabs",
-                  tabPanel("Plot", plotOutput("mainPlot")),
+      tabsetPanel(id = "plotTab",
+                  type = "tabs",
+                  tabPanel("Plot", value = 1, plotOutput("mainPlot")),
                   tabPanel("Map",
+                           value = 2,
                            plotOutput("worldMap"),
                            sliderInput("mapDate",
                                        "Date:",
@@ -188,17 +231,21 @@ server <- function(input, output) {
       }
     })
   output$worldMap <- renderPlot({
+    # Make sure data from all selected dates are loaded
+    walk(as_date(intersect(runDates, input$mapRunDates)), loadByDate)
+    
     inputData %>%
       filter(
-        Variable == input$variable,
-        Date == input$mapDate) %>%
+        Variable == input$mapVariable,
+        Date == input$mapDate,
+        if(Date <= input$mapRunDates) Parent %in% input$mapDataScenario else Parent %in% input$mapModelScenario & RunDate %in% input$mapRunDates) %>%
       select(Jurisdiction, Value) %>%
       right_join(worldMapData, by = "Jurisdiction") %>%
       arrange(order) %>%
       ggplot(aes(long, lat)) +
       geom_polygon(aes(group = group, fill = Value)) +
       scale_fill_viridis_c(trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
-      labs(fill = input$variable) +
+      labs(fill = input$mapVariable) +
       theme_void() +
       theme(
         legend.title = element_text(family = "Helvetica Neue", face = "bold", size = 14),
