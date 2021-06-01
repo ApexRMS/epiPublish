@@ -10,7 +10,7 @@ library(yaml)
 library(stringr)
 library(scales)
 library(maps)
-library(viridisLite)
+library(RColorBrewer)
 
 # Load Data -----
 inputData <- read_csv("data/data.csv")
@@ -48,6 +48,12 @@ loadByDate <- function(runDate) {
 runDates %>%
   tail(1) %>%
   loadByDate
+
+# Find the percentage of dates with data that are forecast only
+colourTransition <- inputData %>%
+  pull(Date) %>%
+  range %>%
+  {as.numeric((runDates %>% tail(1) %>% ymd) - .[1]) / as.numeric(.[2] - .[1]) * 100} 
 
 # UI ----
 
@@ -169,6 +175,19 @@ ui <- fluidPage(
                   tabPanel("Map",
                            value = 2,
                            plotOutput("worldMap"),
+                           tags$head( tags$style( type = "text/css", str_c('
+                             .irs-line{
+                              background: linear-gradient(to right, #428bca, #428bca ', colourTransition, '%, #8BCA42 ', colourTransition, '%, #8BCA42);
+                              border: transparent;
+                             }
+                             .irs-bar-edge{
+                               background: transparent;
+                               border: transparent;
+                             }
+                             .irs-bar {
+                               background: transparent;
+                               border: transparent;
+                             }'))), 
                            sliderInput("mapDate",
                                        "Date:",
                                        min = inputData %>% pull(Date) %>% min,
@@ -207,8 +226,6 @@ server <- function(input, output) {
             geom_point(data = formattedData %>% filter(!Model), aes(colour = Scenario, fill = Scenario), size = 1) +
             geom_ribbon(data = formattedData %>% filter(Model), aes(ymin = Lower, ymax = Upper, colour = Scenario, fill = Scenario), alpha = 0.2) +
             scale_y_continuous(label=comma) +
-            scale_colour_viridis_d() +
-            scale_fill_viridis_d() +
             labs(x = "Date", y = input$variable) +
             theme_bw() +
             theme(
@@ -245,7 +262,7 @@ server <- function(input, output) {
       arrange(order) %>%
       ggplot(aes(long, lat)) +
       geom_polygon(aes(group = group, fill = Value)) +
-      scale_fill_viridis_c(trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
+      scale_fill_gradientn(colors = brewer.pal(11, 'RdYlBu') %>% rev, trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
       labs(fill = str_c(ifelse(input$mapDate <= input$mapRunDates, "Historic\n", "Forecasted\n"), input$mapVariable)) +
       theme_void() +
       theme(
