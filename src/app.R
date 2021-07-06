@@ -220,10 +220,12 @@ server <- function(input, output) {
           filter(Date >= input$xlim[1], Date <= input$xlim[2])
        
       if(nrow(formattedData) > 0){
+        print(formattedData %>% pull(Transformer) %>% unique)
         formattedData %>%
           ggplot(aes(Date, Value)) +
             geom_line(data = formattedData %>% filter(Model), aes(colour = Scenario)) +
-            geom_point(data = formattedData %>% filter(!Model), aes(colour = Scenario, fill = Scenario), size = 1) +
+            geom_point(data = formattedData %>% filter(!Model, Transformer != "Data Transformations: Remove Seasonal Effects"), aes(colour = Scenario, fill = Scenario), size = 1) +
+            geom_line(data = formattedData %>% filter(Transformer == "Data Transformations: Remove Seasonal Effects"), aes(colour = Scenario, fill = Scenario)) +
             geom_ribbon(data = formattedData %>% filter(Model), aes(ymin = Lower, ymax = Upper, colour = Scenario, fill = Scenario), alpha = 0.2) +
             scale_y_continuous(label=comma) +
             labs(x = "Date", y = input$variable) +
@@ -257,12 +259,13 @@ server <- function(input, output) {
         Variable == input$mapVariable,
         Date == input$mapDate,
         if(input$mapDate <= input$mapRunDates) Parent %in% input$mapDataScenario else Parent %in% input$mapModelScenario & RunDate %in% input$mapRunDates) %>%
+      mutate(Value = pmax(Value, 1)) %>%
       select(Jurisdiction, Value) %>%
       right_join(worldMapData, by = "Jurisdiction") %>%
       arrange(order) %>%
       ggplot(aes(long, lat)) +
       geom_polygon(aes(group = group, fill = Value)) +
-      scale_fill_gradientn(colors = brewer.pal(11, 'RdYlBu') %>% rev, trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:9))) +
+      scale_fill_gradientn(colors = brewer.pal(11, 'RdYlBu') %>% rev, trans = "log", labels = comma_format(accuracy = 1), breaks = as.integer(10^(0:15))) +
       labs(fill = str_c(ifelse(input$mapDate <= input$mapRunDates, "Historic\n", "Forecasted\n"), input$mapVariable)) +
       theme_void() +
       theme(
