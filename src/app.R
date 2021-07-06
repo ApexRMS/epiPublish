@@ -175,19 +175,8 @@ ui <- fluidPage(
                   tabPanel("Map",
                            value = 2,
                            plotOutput("worldMap"),
-                           tags$head( tags$style( type = "text/css", str_c('
-                             .irs-line{
-                              background: linear-gradient(to right, #428bca, #428bca ', colourTransition, '%, #8BCA42 ', colourTransition, '%, #8BCA42);
-                              border: transparent;
-                             }
-                             .irs-bar-edge{
-                               background: transparent;
-                               border: transparent;
-                             }
-                             .irs-bar {
-                               background: transparent;
-                               border: transparent;
-                             }'))), 
+                           tags$style(HTML(str_c('.js-irs-0 .irs-line {background: linear-gradient(to right, #428bca, #428bca ', colourTransition, '%, #8BCA42 ', colourTransition, '%, #8BCA42); border: transparent}'))),
+                           tags$style(HTML(str_c('.js-irs-0 .irs-bar {background: transparent; border: transparent}'))),
                            sliderInput("mapDate",
                                        "Date:",
                                        min = inputData %>% pull(Date) %>% min,
@@ -220,7 +209,6 @@ server <- function(input, output) {
           filter(Date >= input$xlim[1], Date <= input$xlim[2])
        
       if(nrow(formattedData) > 0){
-        print(formattedData %>% pull(Transformer) %>% unique)
         formattedData %>%
           ggplot(aes(Date, Value)) +
             geom_line(data = formattedData %>% filter(Model), aes(colour = Scenario)) +
